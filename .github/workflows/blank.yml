@@ -1,36 +1,74 @@
-# This is a basic workflow to help you get started with Actions
+name: Terraform CI/CD - Self Hosted
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+  terraform:
+    name: Terraform
+    runs-on: self-hosted
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      # 1. Checkout repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+
+      # 2. Configure AWS credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+
+      # 3. Check Terraform version
+      # Terraform should already be installed on self-hosted runner
+      - name: Check Terraform Version
+        run: terraform version
+
+
+      # 4. Terraform format check
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+
+      # 5. Terraform Init
+      - name: Terraform Init
+        run: terraform init
+
+
+      # 6. Terraform Validate
+      - name: Terraform Validate
+        run: terraform validate
+
+
+      # 7. Terraform Plan
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+
+      # 8. Terraform Apply
+      # Runs only after merge/push to main
+      - name: Terraform Apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve tfplan
