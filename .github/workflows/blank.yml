@@ -1,4 +1,4 @@
-name: Terraform CI/CD - Self Hosted
+name: Terraform CI/CD
 
 on:
   pull_request:
@@ -14,25 +14,27 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
+  TF_VERSION: 1.9.8
 
 jobs:
   terraform:
     name: Terraform
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     defaults:
       run:
-        shell: bash
         working-directory: ./terraform
 
     steps:
 
-      # 1. Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
 
-      # 2. Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -40,35 +42,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-
-      # 3. Check Terraform version
-      # Terraform should already be installed on self-hosted runner
-      - name: Check Terraform Version
-        run: terraform version
-
-
-      # 4. Terraform format check
       - name: Terraform Format
         run: terraform fmt -check -recursive
 
-
-      # 5. Terraform Init
       - name: Terraform Init
         run: terraform init
 
-
-      # 6. Terraform Validate
       - name: Terraform Validate
         run: terraform validate
 
-
-      # 7. Terraform Plan
       - name: Terraform Plan
         run: terraform plan -out=tfplan
 
-
-      # 8. Terraform Apply
-      # Runs only after merge/push to main
       - name: Terraform Apply
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan
